@@ -14,6 +14,7 @@ namespace LogVisit.Functions
         private readonly VisitorService _visitorService;
         // private readonly ILogger<LogVisits> _logger;
 
+
         public LogVisits(VisitorService visitorService, ILogger<LogVisits> logger)
         {
             _visitorService = visitorService ?? throw new ArgumentNullException(nameof(visitorService));
