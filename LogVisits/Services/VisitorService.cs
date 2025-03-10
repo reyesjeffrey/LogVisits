@@ -26,7 +26,7 @@ namespace LogVisits.Services
                 _cosmosClient = new CosmosClient(connectionString);
                 _container = _cosmosClient.GetContainer(config["CosmosDbDatabase"], config["CosmosDbContainer"]);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // _logger.LogError(ex, "Error initializing CosmosDB client.");
                 throw;
