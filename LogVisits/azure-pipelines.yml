@@ -1,0 +1,30 @@
+trigger:
+- main  # Runs when code is pushed to main branch
+
+pool:
+  vmImage: 'windows-latest'  # Runs on the latest Windows agent
+
+steps:
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '8.x'
+
+- script: dotnet build --configuration Release
+  displayName: 'Build Azure Function App'
+
+- script: dotnet test
+  displayName: 'Run Unit Tests'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Publish Azure Function'
+  inputs:
+    command: 'publish'
+    arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)'
+    publishWebProjects: false
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Store Build Artifacts'
+  inputs:
+    pathToPublish: '$(Build.ArtifactStagingDirectory)'
+    artifactName: 'drop'
