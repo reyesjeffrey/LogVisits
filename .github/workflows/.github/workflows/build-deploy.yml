@@ -1,0 +1,59 @@
+name: Build and Deploy LogVisits
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore LogVisits.sln
+
+      - name: Build Solution
+        run: dotnet build LogVisits.sln --configuration Release --no-restore
+
+      - name: Run Unit Tests
+        run: dotnet test LogVisits.sln --configuration Release --no-build --verbosity normal
+
+      - name: Publish Project
+        run: dotnet publish LogVisits/LogVisits.csproj --configuration Release --output ./publish
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: published-app
+          path: ./publish
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: published-app
+          path: ./publish
+
+      - name: Deploy to Azure Function App
+        uses: azure/functions-action@v1
+        with:
+          app-name: reyesjeffrey
+          package: ./publish
+          publish-profile: ${{ secrets.AZURE_FUNCTION_PUBLISH_PROFILE }}
+
