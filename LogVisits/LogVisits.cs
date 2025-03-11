@@ -46,7 +46,7 @@ namespace LogVisit.Functions
                 }
 
                 visit.date = DateTime.UtcNow;
-                visit.ipAddress = ExtractHeaderValue(req, "X-Forwarded-For") ?? "1.1.1.1";
+                visit.ipAddress = ExtractHeaderValue(req, "X-Forwarded-For") ?? "1.11.1.1";
                 visit.browser = ExtractHeaderValue(req, "User-Agent") ?? "Unknown";
                 visit.referrer = ExtractHeaderValue(req, "Referer") ?? "Unknown";
                 visit.device = DeviceHelper.GetDeviceType(visit.browser);
