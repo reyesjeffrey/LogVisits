@@ -1,30 +1,70 @@
 trigger:
-- main  # Runs when code is pushed to main branch
+- main
 
 pool:
-  vmImage: 'windows-latest'  # Runs on the latest Windows agent
+  name: 'Default'  # Use the self-hosted agent pool name
 
 steps:
+# Checkout the repository, ensuring full history is fetched
+- checkout: self
+  clean: true
+  fetchDepth: 0  # Pull full history
+
+# Debugging the build source directory
+- script: |
+    echo "Source Directory: $(Build.SourcesDirectory)"
+    dir "$(Build.SourcesDirectory)"
+    echo "Listing files in source directory to ensure proper checkout:"
+    dir "$(Build.SourcesDirectory)"
+  displayName: 'Check source code directory contents'
+
+# Clone repository
+- script: git clone https://github.com/reyesjeffrey/LogVisits.git
+  displayName: 'Manually clone repository'
+
+# Ensure .NET SDK is available
 - task: UseDotNet@2
   inputs:
     packageType: 'sdk'
     version: '8.x'
+    installationPath: $(Agent.ToolsDirectory)/dotnet
 
-- script: dotnet build --configuration Release
-  displayName: 'Build Azure Function App'
+# Restore NuGet Packages using the solution file
+- script: dotnet restore "$(Build.SourcesDirectory)/LogVisits/LogVisits.sln"
+  displayName: 'Restore NuGet Packages'
 
-- script: dotnet test
+# Clean the project
+- script: dotnet clean "$(Build.SourcesDirectory)/LogVisits/LogVisits.sln"
+  displayName: 'Clean Project'
+
+# Build the solution
+- script: dotnet build "$(Build.SourcesDirectory)/LogVisits/LogVisits.sln" --configuration Release
+  displayName: 'Build Solution'
+
+# Run Unit Tests (if applicable)
+- script: dotnet test "$(Build.SourcesDirectory)/LogVisits/LogVisits.sln"
   displayName: 'Run Unit Tests'
 
+# Publish the Azure Function
 - task: DotNetCoreCLI@2
   displayName: 'Publish Azure Function'
   inputs:
     command: 'publish'
-    arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)'
+    arguments: '"$(Build.SourcesDirectory)/LogVisits/LogVisits/LogVisits.csproj" --configuration Release --output "$(Build.ArtifactStagingDirectory)"'
     publishWebProjects: false
 
+# Store build artifacts
 - task: PublishBuildArtifacts@1
   displayName: 'Store Build Artifacts'
   inputs:
     pathToPublish: '$(Build.ArtifactStagingDirectory)'
     artifactName: 'drop'
+
+# Deploy the Azure Function
+- task: AzureFunctionApp@1
+  displayName: 'Deploy to Azure Function'
+  inputs:
+    azureSubscription: 'UpdateLogVisit'
+    appType: 'functionApp'
+    appName: 'reyesjeffrey'
+    package: '$(Build.ArtifactStagingDirectory)'
