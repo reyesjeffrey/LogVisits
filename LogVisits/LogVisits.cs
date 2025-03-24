@@ -46,7 +46,7 @@ namespace LogVisit.Functions
                 }
 
                 visit.date = DateTime.UtcNow;
-                visit.ipAddress = ExtractHeaderValue(req, "X-Forwarded-For") ?? "111.1.1.1";
+                visit.ipAddress = GetIpAddress(ExtractHeaderValue(req, "X-Forwarded-For")) ?? "111.1.1.1";
                 visit.browser = ExtractHeaderValue(req, "User-Agent") ?? "Unknown";
                 visit.referrer = ExtractHeaderValue(req, "Referer") ?? "Unknown";
                 visit.device = DeviceHelper.GetDeviceType(visit.browser);
@@ -66,6 +66,17 @@ namespace LogVisit.Functions
                 // _logger.LogError(ex, "Error processing LogVisit function.");
                 return CreateErrorResponse(req, HttpStatusCode.InternalServerError, $"Internal Server Error.{ex.Message}");
             }
+        }
+        private static string? GetIpAddress(string? ipAddress)
+        {
+            if (string.IsNullOrWhiteSpace(ipAddress))
+                return null;
+
+            foreach (var ip in ipAddress.Split(',').Select(ip => ip.Split(':')[0].Trim()))
+                if (IPAddress.TryParse(ip, out _))
+                    return ip;
+
+            return null;
         }
 
         private static string ExtractHeaderValue(HttpRequestData req, string headerName)
