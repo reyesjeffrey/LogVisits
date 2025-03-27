@@ -49,9 +49,10 @@ namespace LogVisits.Services
 
                 // Check Cosmos DB to check if a log already exists for this IP, page, and date
                 var query = new QueryDefinition(
-                    "SELECT * FROM c WHERE c.ipAddress = @ip AND c.pageVisited = @page AND STARTSWITH(c.date, @date)")
+                    "SELECT * FROM c WHERE c.ipAddress = @ip AND c.pageVisited = @page AND c.browser = @browser AND STARTSWITH(c.date, @date)")
                     .WithParameter("@ip", visit.ipAddress)
                     .WithParameter("@page", visit.pageVisited)
+                    .WithParameter("@browser", visit.browser)
                     .WithParameter("@date", visitDate);
 
                 using FeedIterator<VisitorLog> feedIterator = _container.GetItemQueryIterator<VisitorLog>(query);

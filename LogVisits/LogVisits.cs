@@ -4,8 +4,6 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using DeviceDetectorNET;
-using DeviceDetectorNET.Parser;
-using LogVisits.Helpers;
 using LogVisits.Models;
 using LogVisits.Services;
 
