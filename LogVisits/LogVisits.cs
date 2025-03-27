@@ -3,23 +3,23 @@ using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using DeviceDetectorNET;
+using DeviceDetectorNET.Parser;
 using LogVisits.Helpers;
 using LogVisits.Models;
 using LogVisits.Services;
-using UAParser;
 
 namespace LogVisit.Functions
 {
     public class LogVisits
     {
         private readonly VisitorService _visitorService;
-        // private readonly ILogger<LogVisits> _logger;
-
+        private readonly ILogger<LogVisits> _logger;
 
         public LogVisits(VisitorService visitorService, ILogger<LogVisits> logger)
         {
             _visitorService = visitorService ?? throw new ArgumentNullException(nameof(visitorService));
-            // _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         [Function("LogVisit")]
@@ -27,12 +27,12 @@ namespace LogVisit.Functions
             [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
             FunctionContext executionContext)
         {
-            // _logger.LogInformation("Received a new visitor log request.");
+            _logger.LogInformation("Received a new visitor log request.");
 
             try
             {
                 string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-                // _logger.LogInformation($"Received request body: {requestBody}");
+                _logger.LogInformation($"Received request body: {requestBody}");
 
                 if (string.IsNullOrWhiteSpace(requestBody))
                 {
@@ -48,12 +48,17 @@ namespace LogVisit.Functions
 
                 visit.date = DateTime.UtcNow;
                 visit.ipAddress = GetIpAddress(ExtractHeaderValue(req, "X-Forwarded-For")) ?? "111.1.1.1";
-                var userAgent = ExtractHeaderValue(req, "User-Agent") ?? "Unknown";
-                visit.browser = ParseUserAgent(userAgent);
-                visit.referrer = ExtractHeaderValue(req, "Referer") ?? "Unknown";
-                visit.device = GetDeviceInfo(visit.browser);
 
-                // _logger.LogInformation("Logging visit for page {PageVisited} from IP {IpAddress}.", visit.pageVisited, visit.ipAddress);
+                string userAgent = ExtractHeaderValue(req, "User-Agent") ?? "Unknown";
+                visit.referrer = ExtractHeaderValue(req, "Referer") ?? "Unknown";
+
+                // Parse user-agent details
+                var deviceInfo = GetDeviceInfo(userAgent);
+                visit.browser = deviceInfo.Browser;
+                visit.device = deviceInfo.Device;
+                visit.os = deviceInfo.OperatingSystem;
+
+                _logger.LogInformation("Logging visit for page {PageVisited} from IP {IpAddress}.", visit.pageVisited, visit.ipAddress);
 
                 // Ensure only one log per day per IP per page
                 var result = await _visitorService.LogVisitAsync(visit);
@@ -65,8 +70,8 @@ namespace LogVisit.Functions
             }
             catch (Exception ex)
             {
-                // _logger.LogError(ex, "Error processing LogVisit function.");
-                return CreateErrorResponse(req, HttpStatusCode.InternalServerError, $"Internal Server Error.{ex.Message}");
+                _logger.LogError(ex, "Error processing LogVisit function.");
+                return CreateErrorResponse(req, HttpStatusCode.InternalServerError, $"Internal Server Error: {ex.Message}");
             }
         }
 
@@ -82,28 +87,6 @@ namespace LogVisit.Functions
             return null;
         }
 
-        private string ParseUserAgent(string userAgent)
-        {
-            if (string.IsNullOrWhiteSpace(userAgent) || userAgent == "Unknown")
-                return "Unknown Browser";
-
-            var parser = Parser.GetDefault();
-            ClientInfo clientInfo = parser.Parse(userAgent);
-
-            return $"{clientInfo.UA.Family} {clientInfo.UA.Major}";
-        }
-
-        private string GetDeviceInfo(string userAgent)
-        {
-            if (string.IsNullOrWhiteSpace(userAgent) || userAgent == "Unknown")
-                return "Unknown Device";
-
-            var parser = Parser.GetDefault();
-            ClientInfo clientInfo = parser.Parse(userAgent);
-
-            return $"{clientInfo.Device.Family} ({clientInfo.OS.Family} {clientInfo.OS.Major})";
-        }
-
         private static string ExtractHeaderValue(HttpRequestData req, string headerName)
         {
             return req.Headers.TryGetValues(headerName, out var values) ? values.FirstOrDefault()?.Split(',')[0]?.Trim() : null;
@@ -114,6 +97,21 @@ namespace LogVisit.Functions
             var errorResponse = req.CreateResponse(statusCode);
             errorResponse.WriteString(JsonSerializer.Serialize(new { success = false, error = errorMessage }));
             return errorResponse;
+        }
+
+        private static (string Device, string Browser, string OperatingSystem) GetDeviceInfo(string userAgent)
+        {
+            if (string.IsNullOrWhiteSpace(userAgent))
+                return ("Unknown", "Unknown", "Unknown");
+
+            var deviceDetector = new DeviceDetector(userAgent);
+            deviceDetector.Parse();
+
+            string device = deviceDetector.GetDeviceName() ?? "Unknown";
+            string os = deviceDetector.GetOs()?.Match?.Name ?? "Unknown";
+            string browser = deviceDetector.GetClient()?.Match?.Name ?? "Unknown";
+
+            return (device, browser, os);
         }
     }
 }
