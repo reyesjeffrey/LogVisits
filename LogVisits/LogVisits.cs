@@ -56,7 +56,7 @@ namespace LogVisit.Functions
                 var deviceInfo = GetDeviceInfo(userAgent);
                 visit.browser = deviceInfo.Browser;
                 visit.device = deviceInfo.Device;
-                visit.os = deviceInfo.OperatingSystem;
+                //visit.os = deviceInfo.OperatingSystem;
 
                 _logger.LogInformation("Logging visit for page {PageVisited} from IP {IpAddress}.", visit.pageVisited, visit.ipAddress);
 
