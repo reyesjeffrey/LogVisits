@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using LogVisits.Helpers;
 using LogVisits.Models;
 using LogVisits.Services;
+using UAParser;
 
 namespace LogVisit.Functions
 {
@@ -47,9 +48,10 @@ namespace LogVisit.Functions
 
                 visit.date = DateTime.UtcNow;
                 visit.ipAddress = GetIpAddress(ExtractHeaderValue(req, "X-Forwarded-For")) ?? "111.1.1.1";
-                visit.browser = ExtractHeaderValue(req, "User-Agent") ?? "Unknown";
+                var userAgent = ExtractHeaderValue(req, "User-Agent") ?? "Unknown";
+                visit.browser = ParseUserAgent(userAgent);
                 visit.referrer = ExtractHeaderValue(req, "Referer") ?? "Unknown";
-                visit.device = DeviceHelper.GetDeviceType(visit.browser);
+                visit.device = GetDeviceInfo(visit.browser);
 
                 // _logger.LogInformation("Logging visit for page {PageVisited} from IP {IpAddress}.", visit.pageVisited, visit.ipAddress);
 
@@ -67,6 +69,7 @@ namespace LogVisit.Functions
                 return CreateErrorResponse(req, HttpStatusCode.InternalServerError, $"Internal Server Error.{ex.Message}");
             }
         }
+
         private static string? GetIpAddress(string? ipAddress)
         {
             if (string.IsNullOrWhiteSpace(ipAddress))
@@ -77,6 +80,28 @@ namespace LogVisit.Functions
                     return ip;
 
             return null;
+        }
+
+        private string ParseUserAgent(string userAgent)
+        {
+            if (string.IsNullOrWhiteSpace(userAgent) || userAgent == "Unknown")
+                return "Unknown Browser";
+
+            var parser = Parser.GetDefault();
+            ClientInfo clientInfo = parser.Parse(userAgent);
+
+            return $"{clientInfo.UA.Family} {clientInfo.UA.Major}";
+        }
+
+        private string GetDeviceInfo(string userAgent)
+        {
+            if (string.IsNullOrWhiteSpace(userAgent) || userAgent == "Unknown")
+                return "Unknown Device";
+
+            var parser = Parser.GetDefault();
+            ClientInfo clientInfo = parser.Parse(userAgent);
+
+            return $"{clientInfo.Device.Family} ({clientInfo.OS.Family} {clientInfo.OS.Major})";
         }
 
         private static string ExtractHeaderValue(HttpRequestData req, string headerName)
